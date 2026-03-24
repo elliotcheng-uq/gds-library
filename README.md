@@ -97,7 +97,7 @@ hex_circ_Dia4um_Lcc10um_Area500um.gds
 ## Author
 
 **Elliot Cheng**
-ANFF-Q, The University of Queensland
+The University of Queensland
 h.cheng6@uq.edu.au
 
 ---
