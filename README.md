@@ -1,6 +1,6 @@
-# GDS Library — ANFF-Q
+# GDS Library
 
-A collection of GDS-II file generators for nanofabrication mask design, developed at the **Australian National Fabrication Facility Queensland (ANFF-Q), University of Queensland**.
+A collection of GDS-II file generators for nanofabrication mask design, developed at the **University of Queensland**.
 
 ---
 
