@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GDS Array Generator · ANFF-Q</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #0a0c10;
+    --surface: #111418;
+    --surface2: #1a1f27;
+    --border: #252c38;
+    --accent: #00d4aa;
+    --accent2: #0088ff;
+    --warn: #ff6b35;
+    --text: #e8edf5;
+    --muted: #6b7a8d;
+    --canvas-bg: #0a0c10;
+    --grid-color: #1a1f27;
+  }
+
+  body.theme-light {
+    --bg: #f0f2f5;
+    --surface: #ffffff;
+    --surface2: #e8edf5;
+    --border: #d0d8e4;
+    --text: #1a2030;
+    --muted: #7a8899;
+    --canvas-bg: #f8fafc;
+    --grid-color: #e0e8f0;
+  }
+
+  body.theme-white {
+    --bg: #ffffff;
+    --surface: #f8f8f8;
+    --surface2: #eeeeee;
+    --border: #dddddd;
+    --text: #111111;
+    --muted: #888888;
+    --canvas-bg: #ffffff;
+    --grid-color: #eeeeee;
+  }
+
+  body.theme-blueprint {
+    --bg: #0d1f3c;
+    --surface: #112244;
+    --surface2: #162b52;
+    --border: #1e3a6e;
+    --accent: #4fc3f7;
+    --text: #cce8ff;
+    --muted: #5b85aa;
+    --canvas-bg: #0d1f3c;
+    --grid-color: #1a3060;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    transition: background 0.25s, color 0.25s;
+  }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .logo-badge {
+    background: var(--accent);
+    color: #000;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 8px;
+    letter-spacing: 0.08em;
+    border-radius: 2px;
+  }
+
+  header h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+  }
+
+  header .ver {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: 11px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    overflow: hidden;
+    height: calc(100vh - 55px);
+  }
+
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+  }
+
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 9px;
+  }
+
+  .pill-group { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .pill {
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    user-select: none;
+  }
+
+  .pill:hover { border-color: var(--accent); color: var(--text); }
+  .pill.active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
+
+  .shape-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+
+  .shape-card {
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 9px 5px 7px;
+    cursor: pointer;
+    text-align: center;
+    background: var(--surface2);
+    transition: all 0.15s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    user-select: none;
+  }
+
+  .shape-card:hover { border-color: var(--accent); }
+  .shape-card.active { border-color: var(--accent); background: #00d4aa18; }
+  .shape-card svg { width: 26px; height: 26px; color: var(--muted); }
+  .shape-card.active svg { color: var(--accent); }
+  .shape-card span { font-size: 9px; color: var(--muted); font-family: 'Space Mono', monospace; text-transform: uppercase; letter-spacing: 0.04em; }
+  .shape-card.active span { color: var(--accent); }
+
+  .field-group { display: flex; flex-direction: column; gap: 11px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+
+  .field label {
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .field label strong { color: var(--text); font-weight: 500; }
+
+  .field label .unit {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    background: #00d4aa14;
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+
+  .field input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--border);
+    outline: none;
+    cursor: pointer;
+  }
+
+  .field input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+
+  .field-row { display: flex; gap: 8px; align-items: center; }
+
+  .num-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    width: 75px;
+    text-align: right;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .num-input:focus { border-color: var(--accent); }
+
+  .divider { border: none; border-top: 1px solid var(--border); }
+
+  .theme-row { display: flex; gap: 7px; align-items: center; }
+
+  .theme-swatch {
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .theme-swatch:hover { transform: scale(1.12); }
+  .theme-swatch.active { border-color: var(--accent); }
+  .theme-swatch[data-theme="dark"]      { background: linear-gradient(135deg, #0a0c10 50%, #1a1f27 50%); }
+  .theme-swatch[data-theme="light"]     { background: linear-gradient(135deg, #f0f2f5 50%, #e8edf5 50%); border: 2px solid #ccc; }
+  .theme-swatch[data-theme="white"]     { background: #ffffff; border: 2px solid #ddd; }
+  .theme-swatch[data-theme="blueprint"] { background: linear-gradient(135deg, #0d1f3c 50%, #1e3a6e 50%); }
+  .theme-swatch.active[data-theme="light"] { border-color: var(--accent) !important; }
+  .theme-swatch.active[data-theme="white"] { border-color: var(--accent) !important; }
+
+  .theme-label { font-size: 11px; color: var(--muted); margin-left: 4px; font-family: 'Space Mono', monospace; }
+
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+
+  .stat-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 11px;
+  }
+
+  .stat-card .val { font-family: 'Space Mono', monospace; font-size: 15px; color: var(--accent); font-weight: 700; }
+  .stat-card .lbl { font-size: 10px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .filename-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 11px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--accent2);
+    word-break: break-all;
+    line-height: 1.6;
+  }
+
+  .btn-row { display: flex; gap: 8px; }
+
+  .btn {
+    flex: 1;
+    padding: 11px;
+    border: none;
+    border-radius: 6px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s;
+  }
+
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { filter: brightness(1.12); transform: translateY(-1px); box-shadow: 0 4px 16px #00d4aa44; }
+  .btn-primary:active { transform: none; }
+  .btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .warning-badge {
+    background: #ff6b3522;
+    border: 1px solid #ff6b3555;
+    color: var(--warn);
+    font-size: 11px;
+    padding: 7px 11px;
+    border-radius: 4px;
+    font-family: 'Space Mono', monospace;
+    display: none;
+  }
+  .warning-badge.show { display: block; }
+
+  .preview-area { display: flex; flex-direction: column; overflow: hidden; }
+
+  .preview-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .preview-toolbar .ttl {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.07em;
+  }
+
+  .zoom-controls { display: flex; align-items: center; gap: 5px; margin-left: auto; }
+
+  .zoom-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: 26px; height: 26px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.15s;
+  }
+
+  .zoom-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .zoom-level {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    min-width: 42px;
+    text-align: center;
+  }
+
+  #canvas-wrap { flex: 1; position: relative; overflow: hidden; }
+  #gds-canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+  #gds-canvas:active { cursor: grabbing; }
+
+  .overlay-info {
+    position: absolute;
+    bottom: 14px; right: 14px;
+    background: rgba(10,12,16,0.82);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 11px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    pointer-events: none;
+    backdrop-filter: blur(8px);
+    line-height: 1.7;
+  }
+
+  .overlay-info span { color: var(--accent); }
+
+  .layer-legend {
+    position: absolute;
+    top: 10px; right: 14px;
+    background: rgba(10,12,16,0.82);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 13px;
+    pointer-events: none;
+    backdrop-filter: blur(8px);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--muted);
+    font-size: 11px;
+    margin-bottom: 4px;
+  }
+
+  .legend-item:last-child { margin-bottom: 0; }
+  .legend-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+</style>
+</head>
+<body id="app-body">
+
+<header>
+  <div class="logo-badge">ANFF-Q</div>
+  <h1>GDS-II Array Generator</h1>
+  <span class="ver">v2.2 · Web Edition</span>
+</header>
+
+<div class="main">
+  <div class="sidebar">
+
+    <!-- Lattice -->
+    <div>
+      <div class="section-label">Array Lattice</div>
+      <div class="pill-group" id="lattice-group">
+        <div class="pill active" data-lattice="hexagonal" onclick="setLattice('hexagonal')">
+          <svg width="13" height="13" viewBox="0 0 14 14"><polygon points="7,1 13,4.5 13,9.5 7,13 1,9.5 1,4.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+          Hexagonal
+        </div>
+        <div class="pill" data-lattice="square" onclick="setLattice('square')">
+          <svg width="13" height="13" viewBox="0 0 14 14"><rect x="1" y="1" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+          Square
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Shape -->
+    <div>
+      <div class="section-label">Element Shape</div>
+      <div class="shape-grid" id="shape-group">
+
+        <div class="shape-card active" data-shape="circle" onclick="setShape('circle')">
+          <svg viewBox="0 0 28 28"><circle cx="14" cy="14" r="10" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          <span>Circle</span>
+        </div>
+
+        <div class="shape-card" data-shape="hexagon" onclick="setShape('hexagon')">
+          <svg viewBox="0 0 28 28"><polygon points="14,3 24,8.5 24,19.5 14,25 4,19.5 4,8.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          <span>Hexagon</span>
+        </div>
+
+        <div class="shape-card" data-shape="square" onclick="setShape('square')">
+          <svg viewBox="0 0 28 28"><rect x="4" y="4" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          <span>Square</span>
+        </div>
+
+        <div class="shape-card" data-shape="triangle" onclick="setShape('triangle')">
+          <svg viewBox="0 0 28 28"><polygon points="14,3 25,24 3,24" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          <span>Triangle</span>
+        </div>
+
+        <div class="shape-card" data-shape="diamond" onclick="setShape('diamond')">
+          <svg viewBox="0 0 28 28"><polygon points="14,3 25,14 14,25 3,14" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          <span>Diamond</span>
+        </div>
+
+        <div class="shape-card" data-shape="octagon" onclick="setShape('octagon')">
+          <svg viewBox="0 0 28 28"><polygon points="9,3 19,3 25,9 25,19 19,25 9,25 3,19 3,9" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          <span>Octagon</span>
+        </div>
+
+        <div class="shape-card" data-shape="cross" onclick="setShape('cross')">
+          <svg viewBox="0 0 28 28"><path d="M11,3 h6 v8 h8 v6 h-8 v8 h-6 v-8 h-8 v-6 h8 z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span>Cross</span>
+        </div>
+
+        <div class="shape-card" data-shape="ring" onclick="setShape('ring')">
+          <svg viewBox="0 0 28 28">
+            <circle cx="14" cy="14" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+            <circle cx="14" cy="14" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+          <span>Ring</span>
+        </div>
+
+      </div>
+
+      <div id="ring-extra" style="margin-top:10px;display:none;">
+        <div class="field">
+          <label><strong>Inner Radius</strong><span class="unit">μm</span></label>
+          <div class="field-row">
+            <input type="range" id="r-inner" min="0.05" max="19" step="0.05" value="1">
+            <input type="number" class="num-input" id="n-inner" value="1" min="0.05" step="0.05">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Geometry -->
+    <div>
+      <div class="section-label">Geometry</div>
+      <div class="field-group">
+        <div class="field">
+          <label><strong>Element Radius</strong><span class="unit">μm</span></label>
+          <div class="field-row">
+            <input type="range" id="r-radius" min="0.1" max="20" step="0.1" value="2">
+            <input type="number" class="num-input" id="n-radius" value="2" min="0.1" max="20" step="0.1">
+          </div>
+        </div>
+        <div class="field">
+          <label><strong>Centre-to-Centre Pitch</strong><span class="unit">μm</span></label>
+          <div class="field-row">
+            <input type="range" id="r-pitch" min="1" max="100" step="0.5" value="10">
+            <input type="number" class="num-input" id="n-pitch" value="10" min="1" max="100" step="0.5">
+          </div>
+        </div>
+        <div class="field">
+          <label><strong>Write Area Width</strong><span class="unit">μm</span></label>
+          <div class="field-row">
+            <input type="range" id="r-area" min="10" max="2000" step="10" value="200">
+            <input type="number" class="num-input" id="n-area" value="200" min="10" max="2000" step="10">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="warning-badge" id="ratio-warn">⚠ Element size ≥ pitch — overlap detected!</div>
+
+    <hr class="divider">
+
+    <!-- Theme -->
+    <div>
+      <div class="section-label">Canvas Background</div>
+      <div class="theme-row">
+        <div class="theme-swatch active" data-theme="dark"      onclick="setTheme('dark')"      title="Dark"></div>
+        <div class="theme-swatch"        data-theme="light"     onclick="setTheme('light')"     title="Light"></div>
+        <div class="theme-swatch"        data-theme="white"     onclick="setTheme('white')"     title="White / Print"></div>
+        <div class="theme-swatch"        data-theme="blueprint" onclick="setTheme('blueprint')" title="Blueprint"></div>
+        <span class="theme-label" id="theme-label">Dark</span>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Stats -->
+    <div>
+      <div class="section-label">Statistics</div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="val" id="stat-dots">—</div><div class="lbl">Elements</div></div>
+        <div class="stat-card"><div class="val" id="stat-fill">—</div><div class="lbl">Fill %</div></div>
+        <div class="stat-card"><div class="val" id="stat-cols">—</div><div class="lbl">Columns</div></div>
+        <div class="stat-card"><div class="val" id="stat-rows">—</div><div class="lbl">Rows</div></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Output Filename</div>
+      <div class="filename-box" id="filename-display">—</div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="resetView()">⟲ Reset</button>
+      <button class="btn btn-primary" onclick="exportGDS()">⬇ Export .GDS</button>
+    </div>
+
+  </div>
+
+  <!-- Canvas -->
+  <div class="preview-area">
+    <div class="preview-toolbar">
+      <span class="ttl" id="toolbar-label">HEX · CIRCLE · LAYER 0 / BBOX LAYER 99</span>
+      <div class="zoom-controls">
+        <button class="zoom-btn" onclick="adjustZoom(-0.25)">−</button>
+        <span class="zoom-level" id="zoom-disp">100%</span>
+        <button class="zoom-btn" onclick="adjustZoom(0.25)">+</button>
+      </div>
+    </div>
+    <div id="canvas-wrap">
+      <canvas id="gds-canvas"></canvas>
+      <div class="layer-legend">
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:var(--accent)"></div>
+          Layer 0 — Elements
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:transparent;border:1px solid #ff6b35;"></div>
+          Layer 99 — Bounding Box
+        </div>
+      </div>
+      <div class="overlay-info">
+        Scroll to zoom · Drag to pan<br>
+        Cursor: <span id="cx">—</span>, <span id="cy">—</span> μm
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentLattice = 'hexagonal';
+let currentShape   = 'circle';
+let currentTheme   = 'dark';
+let zoom = 1, panX = 0, panY = 0;
+let dragging = false, lastMX = 0, lastMY = 0;
+
+const canvas = document.getElementById('gds-canvas');
+const ctx    = canvas.getContext('2d');
+
+// ── Theme ─────────────────────────────────────────────────────────
+const THEME_NAMES = { dark:'Dark', light:'Light', white:'White / Print', blueprint:'Blueprint' };
+function setTheme(t) {
+  currentTheme = t;
+  document.getElementById('app-body').className = 'theme-' + t;
+  document.querySelectorAll('.theme-swatch').forEach(s => s.classList.toggle('active', s.dataset.theme === t));
+  document.getElementById('theme-label').textContent = THEME_NAMES[t];
+  draw();
+}
+
+// ── Lattice / Shape ───────────────────────────────────────────────
+function setLattice(l) {
+  currentLattice = l;
+  document.querySelectorAll('#lattice-group .pill').forEach(p => p.classList.toggle('active', p.dataset.lattice === l));
+  refresh();
+}
+function setShape(s) {
+  currentShape = s;
+  document.querySelectorAll('#shape-group .shape-card').forEach(c => c.classList.toggle('active', c.dataset.shape === s));
+  document.getElementById('ring-extra').style.display = s === 'ring' ? 'block' : 'none';
+  refresh();
+}
+function refresh() {
+  const L = currentLattice.toUpperCase(), S = currentShape.toUpperCase();
+  document.getElementById('toolbar-label').textContent = `${L} ARRAY · ${S} · LAYER 0 / BBOX LAYER 99`;
+  updateStats(getParams());
+  draw();
+}
+
+// ── Params ────────────────────────────────────────────────────────
+function getParams() {
+  return {
+    radius: parseFloat(document.getElementById('n-radius').value) || 2,
+    pitch:  parseFloat(document.getElementById('n-pitch').value)  || 10,
+    area:   parseFloat(document.getElementById('n-area').value)   || 200,
+    inner:  parseFloat(document.getElementById('n-inner').value)  || 0,
+  };
+}
+
+// ── Lattice positions ─────────────────────────────────────────────
+// Hexagonal = triangular Bravais lattice = true hexagonal close-packing.
+// Each dot has 6 equidistant neighbours. Row spacing = pitch * sqrt(3)/2,
+// alternate rows offset by pitch/2. This is what your original Python did.
+//
+// Square = simple square/cubic lattice. Each dot has 4 nearest neighbours.
+function getLatticePositions(p) {
+  const hw  = p.area / 2;
+  const pos = [];
+
+  if (currentLattice === 'square') {
+    // Simple square lattice
+    const n = Math.ceil(p.area / p.pitch) + 2;
+    for (let r = 0; r < n; r++)
+      for (let c = 0; c < n; c++)
+        pos.push([-hw + c * p.pitch, -hw + r * p.pitch]);
+
+  } else {
+    // Hexagonal (triangular Bravais lattice) — true 6-neighbour packing
+    // Row height = pitch * sqrt(3)/2; odd rows shift by pitch/2
+    const rowH = p.pitch * Math.sqrt(3) / 2;
+    const cols = Math.ceil(p.area / p.pitch) + 2;
+    const rows = Math.ceil(p.area / rowH) + 2;
+    for (let r = 0; r < rows; r++) {
+      const off = (r % 2) * p.pitch * 0.5;
+      for (let c = 0; c < cols; c++)
+        pos.push([-hw + c * p.pitch + off, -hw + r * rowH]);
+    }
+  }
+  return pos;
+}
+
+// ── Shape polygon ─────────────────────────────────────────────────
+function shapePolygon(cx, cy, r, shape, innerR) {
+  const pts = [];
+  switch (shape) {
+    case 'circle': {
+      const N = 32;
+      for (let i = 0; i <= N; i++) { const a = 2*Math.PI*i/N; pts.push([cx+r*Math.cos(a), cy+r*Math.sin(a)]); }
+      break;
+    }
+    case 'hexagon': {
+      for (let i = 0; i <= 6; i++) { const a = Math.PI/3*i+Math.PI/6; pts.push([cx+r*Math.cos(a), cy+r*Math.sin(a)]); }
+      break;
+    }
+    case 'square': {
+      const h = r * 0.85;
+      pts.push([cx-h,cy-h],[cx+h,cy-h],[cx+h,cy+h],[cx-h,cy+h],[cx-h,cy-h]);
+      break;
+    }
+    case 'triangle': {
+      for (let i = 0; i <= 3; i++) { const a = 2*Math.PI*i/3-Math.PI/2; pts.push([cx+r*Math.cos(a), cy+r*Math.sin(a)]); }
+      break;
+    }
+    case 'diamond': {
+      pts.push([cx,cy-r],[cx+r,cy],[cx,cy+r],[cx-r,cy],[cx,cy-r]);
+      break;
+    }
+    case 'octagon': {
+      for (let i = 0; i <= 8; i++) { const a = Math.PI/4*i+Math.PI/8; pts.push([cx+r*Math.cos(a), cy+r*Math.sin(a)]); }
+      break;
+    }
+    case 'cross': {
+      const t=r*0.35, e=r;
+      pts.push([cx-t,cy-e],[cx+t,cy-e],[cx+t,cy-t],[cx+e,cy-t],[cx+e,cy+t],
+               [cx+t,cy+t],[cx+t,cy+e],[cx-t,cy+e],[cx-t,cy+t],[cx-e,cy+t],
+               [cx-e,cy-t],[cx-t,cy-t],[cx-t,cy-e]);
+      break;
+    }
+    case 'ring': {
+      const N = 32, ir = innerR > 0 ? innerR : r*0.5;
+      for (let i=0;i<=N;i++){const a=2*Math.PI*i/N; pts.push([cx+r*Math.cos(a),cy+r*Math.sin(a)]);}
+      const inner=[];
+      for (let i=0;i<=N;i++){const a=2*Math.PI*i/N; inner.push([cx+ir*Math.cos(a),cy+ir*Math.sin(a)]);}
+      return { outer: pts, inner };
+    }
+  }
+  return { outer: pts };
+}
+
+// ── Draw single shape on canvas ───────────────────────────────────
+function drawShapeCanvas(cx, cy, r, shape, innerR, fast) {
+  if (fast) {
+    const sq = r * 1.4;
+    ctx.fillRect(cx - sq/2, cy - sq/2, sq, sq);
+    return;
+  }
+  const res = shapePolygon(cx, cy, r, shape, innerR);
+  if (shape === 'ring') {
+    ctx.save();
+    ctx.beginPath();
+    for (const [x,y] of res.outer) ctx.lineTo(x,y);
+    ctx.closePath();
+    for (const [x,y] of res.inner) ctx.lineTo(x,y);
+    ctx.closePath();
+    ctx.fill('evenodd');
+    ctx.restore();
+  } else {
+    ctx.beginPath();
+    for (const [x,y] of res.outer) ctx.lineTo(x,y);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+// ── Stats ─────────────────────────────────────────────────────────
+function elementArea(r, shape, innerR) {
+  switch(shape) {
+    case 'circle':   return Math.PI*r*r;
+    case 'hexagon':  return 3*Math.sqrt(3)/2*r*r;
+    case 'square':   return 4*r*r*0.85*0.85;
+    case 'triangle': return Math.sqrt(3)/4*(r*Math.sqrt(3))**2;
+    case 'diamond':  return 2*r*r;
+    case 'octagon':  return 2*(1+Math.SQRT2)*r*r*0.75;
+    case 'cross':    { const t=r*0.35,e=r; return 2*t*(2*e) - (t*t)*4; }
+    case 'ring':     { const ir=innerR||r*0.5; return Math.PI*(r*r-ir*ir); }
+    default:         return Math.PI*r*r;
+  }
+}
+
+function updateStats(p) {
+  const pos = getLatticePositions(p);
+  const hw  = p.area/2;
+  const vis = pos.filter(([x,y]) => x>=-hw-p.pitch && x<=hw+p.pitch && y>=-hw-p.pitch && y<=hw+p.pitch);
+
+  const total = vis.length;
+  const fill  = ((total * elementArea(p.radius, currentShape, p.inner)) / (p.area*p.area) * 100).toFixed(1);
+
+  let cols='—', rows='—';
+  if (currentLattice === 'square') {
+    cols = rows = Math.ceil(p.area / p.pitch);
+  } else {
+    // hexagonal
+    cols = Math.ceil(p.area / p.pitch);
+    rows = Math.ceil(p.area / (p.pitch * Math.sqrt(3) / 2));
+  }
+
+  document.getElementById('stat-dots').textContent = total.toLocaleString();
+  document.getElementById('stat-fill').textContent = fill + '%';
+  document.getElementById('stat-cols').textContent = cols;
+  document.getElementById('stat-rows').textContent = rows;
+
+  const lc = currentLattice === 'square' ? 'sq' : 'hex';
+  const sc = currentShape.substring(0,4);
+  document.getElementById('filename-display').textContent =
+    `${lc}_${sc}_Dia${Math.round(2*p.radius)}um_Lcc${Math.round(p.pitch)}um_Area${Math.round(p.area)}um.gds`;
+
+  document.getElementById('ratio-warn').classList.toggle('show', p.radius*2 >= p.pitch);
+}
+
+// ── Resize & Draw ─────────────────────────────────────────────────
+function resizeCanvas() {
+  const wrap = document.getElementById('canvas-wrap');
+  canvas.width  = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+  draw();
+}
+
+function cssVar(name) {
+  return getComputedStyle(document.getElementById('app-body')).getPropertyValue(name).trim();
+}
+
+function draw() {
+  const p = getParams();
+  const W = canvas.width, H = canvas.height;
+
+  ctx.fillStyle = cssVar('--canvas-bg') || '#0a0c10';
+  ctx.fillRect(0,0,W,H);
+
+  // Grid
+  ctx.strokeStyle = cssVar('--grid-color') || '#1a1f27';
+  ctx.lineWidth = 1;
+  const gs  = 40 * zoom;
+  const gox = ((W/2 + panX*zoom) % gs + gs) % gs;
+  const goy = ((H/2 - panY*zoom) % gs + gs) % gs;
+  for (let x=gox; x<W; x+=gs){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y=goy; y<H; y+=gs){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  const scale = zoom * Math.min(W,H) / p.area * 0.8;
+  const cx0   = W/2 + panX*zoom;
+  const cy0   = H/2 - panY*zoom;
+
+  ctx.save();
+  ctx.translate(cx0, cy0);
+  ctx.scale(scale, -scale);
+
+  // Bounding box
+  const hw = p.area/2;
+  ctx.strokeStyle = '#ff6b35';
+  ctx.lineWidth   = 1.5/scale;
+  ctx.setLineDash([6/scale, 4/scale]);
+  ctx.strokeRect(-hw,-hw,p.area,p.area);
+  ctx.setLineDash([]);
+
+  // Elements
+  const accent = cssVar('--accent') || '#00d4aa';
+  ctx.fillStyle = accent + 'cc';
+
+  const positions = getLatticePositions(p);
+  const total     = positions.length;
+  const MAX_DRAW  = 6000;
+  const fast      = total > MAX_DRAW;
+  const skip      = fast ? Math.ceil(Math.sqrt(total/MAX_DRAW)) : 1;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-hw - p.radius*2, -hw - p.radius*2, p.area + p.radius*4, p.area + p.radius*4);
+  ctx.clip();
+
+  for (let i=0; i<positions.length; i+=skip) {
+    const [x,y] = positions[i];
+    drawShapeCanvas(x, y, p.radius, currentShape, p.inner, fast);
+  }
+
+  ctx.restore();
+  ctx.restore();
+
+  if (fast) {
+    ctx.save();
+    ctx.fillStyle = '#ff6b35';
+    ctx.font = '11px Space Mono, monospace';
+    ctx.fillText(`⚡ LOD preview (${total.toLocaleString()} elements — zoom in for detail)`, 12, H-14);
+    ctx.restore();
+  }
+
+  updateStats(p);
+}
+
+// ── Sync sliders ──────────────────────────────────────────────────
+function syncField(sid, nid) {
+  const s=document.getElementById(sid), n=document.getElementById(nid);
+  s.addEventListener('input', ()=>{ n.value=s.value; updateStats(getParams()); draw(); });
+  n.addEventListener('input', ()=>{ s.value=n.value; updateStats(getParams()); draw(); });
+}
+syncField('r-radius','n-radius');
+syncField('r-pitch','n-pitch');
+syncField('r-area','n-area');
+syncField('r-inner','n-inner');
+
+// ── Pan / Zoom ────────────────────────────────────────────────────
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  zoom = Math.min(Math.max(zoom * (e.deltaY<0 ? 1.12 : 0.9), 0.05), 100);
+  document.getElementById('zoom-disp').textContent = Math.round(zoom*100)+'%';
+  draw();
+}, { passive: false });
+
+canvas.addEventListener('mousedown', e=>{ dragging=true; lastMX=e.clientX; lastMY=e.clientY; });
+window.addEventListener('mouseup',   ()=>{ dragging=false; });
+
+canvas.addEventListener('mousemove', e=>{
+  if (dragging) {
+    panX += (e.clientX-lastMX)/zoom;
+    panY += (e.clientY-lastMY)/zoom;
+    lastMX=e.clientX; lastMY=e.clientY;
+    draw();
+  }
+  const p=getParams();
+  const scale=zoom*Math.min(canvas.width,canvas.height)/p.area*0.8;
+  const rect=canvas.getBoundingClientRect();
+  document.getElementById('cx').textContent = ((e.clientX-rect.left-canvas.width/2-panX*zoom)/scale).toFixed(2);
+  document.getElementById('cy').textContent = (-(e.clientY-rect.top-canvas.height/2+panY*zoom)/scale).toFixed(2);
+});
+
+function adjustZoom(d) {
+  zoom=Math.min(Math.max(zoom+d,0.05),100);
+  document.getElementById('zoom-disp').textContent=Math.round(zoom*100)+'%';
+  draw();
+}
+function resetView() {
+  zoom=1; panX=0; panY=0;
+  document.getElementById('zoom-disp').textContent='100%';
+  draw();
+}
+
+// ── GDS-II Binary Export ──────────────────────────────────────────
+function exportGDS() {
+  const p  = getParams();
+  const hw = p.area/2;
+  const SC = 1000; // 1μm = 1000 nm db units
+  const toInt = v => Math.round(v*SC);
+
+  function signed32(v) {
+    const buf=new ArrayBuffer(4); new DataView(buf).setInt32(0,Math.round(v),false);
+    return [...new Uint8Array(buf)];
+  }
+  function i16b(v){ return [(v>>8)&0xFF, v&0xFF]; }
+  function str2b(s){ const b=[]; for(const c of s) b.push(c.charCodeAt(0)); if(b.length%2) b.push(0); return b; }
+  function gdsReal(v) {
+    if(v===0) return [0,0,0,0,0,0,0,0];
+    const sg=v<0?0x80:0; v=Math.abs(v); let e=0;
+    while(v>=1){v/=16;e++;} while(v<1/16){v*=16;e--;}
+    const b=[sg|(e+64)]; let m=v;
+    for(let i=0;i<7;i++){m*=256; b.push(Math.floor(m)&0xFF); m-=Math.floor(m);}
+    return b;
+  }
+  function rec(arr,code,data){ const l=4+data.length; arr.push((l>>8)&0xFF,l&0xFF,(code>>8)&0xFF,code&0xFF,...data); }
+  function xyFromPts(pts){ const d=[]; for(const [x,y] of pts){ d.push(...signed32(toInt(x)),...signed32(toInt(y))); } return d; }
+  function ensureClosed(pts) {
+    if(!pts.length) return pts;
+    const f=pts[0],l=pts[pts.length-1];
+    if(f[0]!==l[0]||f[1]!==l[1]) return [...pts,f];
+    return pts;
+  }
+
+  const HEADER=0x0002,BGNLIB=0x0102,LIBNAME=0x0206,UNITS=0x0305,ENDLIB=0x0400;
+  const BGNSTR=0x0502,STRNAME=0x0606,ENDSTR=0x0700;
+  const BOUNDARY=0x0800,ENDEL=0x1100,XY=0x1003,LAYER=0x0D02,DATATYPE=0x0E02;
+
+  const now=new Date();
+  const dt=[...i16b(now.getFullYear()),...i16b(now.getMonth()+1),...i16b(now.getDate()),
+            ...i16b(now.getHours()),...i16b(now.getMinutes()),...i16b(now.getSeconds())];
+  const dts=[...dt,...dt];
+
+  const bytes=[];
+  rec(bytes,HEADER,i16b(600));
+  rec(bytes,BGNLIB,dts);
+  rec(bytes,LIBNAME,str2b('LIBRARY'));
+  rec(bytes,UNITS,[...gdsReal(1e-3),...gdsReal(1e-9)]);
+  rec(bytes,BGNSTR,dts);
+  rec(bytes,STRNAME,str2b('ARRAY'));
+
+  const positions=getLatticePositions(p);
+
+  for (const [cx,cy] of positions) {
+    const res=shapePolygon(cx,cy,p.radius,currentShape,p.inner);
+
+    rec(bytes,BOUNDARY,[]);
+    rec(bytes,LAYER,i16b(0));
+    rec(bytes,DATATYPE,i16b(0));
+    rec(bytes,XY,xyFromPts(ensureClosed(res.outer)));
+    rec(bytes,ENDEL,[]);
+
+    if (res.inner) {
+      rec(bytes,BOUNDARY,[]);
+      rec(bytes,LAYER,i16b(1));
+      rec(bytes,DATATYPE,i16b(0));
+      rec(bytes,XY,xyFromPts(ensureClosed(res.inner)));
+      rec(bytes,ENDEL,[]);
+    }
+  }
+
+  // Bounding box layer 99
+  const bb=[[toInt(-hw),toInt(-hw)],[toInt(hw),toInt(-hw)],[toInt(hw),toInt(hw)],[toInt(-hw),toInt(hw)],[toInt(-hw),toInt(-hw)]];
+  rec(bytes,BOUNDARY,[]);
+  rec(bytes,LAYER,i16b(99));
+  rec(bytes,DATATYPE,i16b(0));
+  const bbXY=[]; for(const[x,y]of bb){bbXY.push(...signed32(x),...signed32(y));}
+  rec(bytes,XY,bbXY);
+  rec(bytes,ENDEL,[]);
+
+  rec(bytes,ENDSTR,[]);
+  rec(bytes,ENDLIB,[]);
+
+  const lc = currentLattice === 'square' ? 'sq' : 'hex';
+  const sc=currentShape.substring(0,4);
+  const fname=`${lc}_${sc}_Dia${Math.round(2*p.radius)}um_Lcc${Math.round(p.pitch)}um_Area${Math.round(p.area)}um.gds`;
+
+  const blob=new Blob([new Uint8Array(bytes)],{type:'application/octet-stream'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=fname; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+updateStats(getParams());
+</script>
+</body>
+</html>
