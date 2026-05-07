@@ -313,6 +313,54 @@
   }
   .warning-badge.show { display: block; }
 
+  #preview-blocked {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: rgba(10,12,16,0.93);
+    backdrop-filter: blur(6px);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 14px;
+    text-align: center;
+    padding: 32px;
+    z-index: 10;
+  }
+  #preview-blocked.show { display: flex; }
+  #preview-blocked .pb-icon { font-size: 36px; line-height: 1; }
+  #preview-blocked .pb-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--warn);
+    letter-spacing: 0.04em;
+  }
+  #preview-blocked .pb-count {
+    font-family: 'Space Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  #preview-blocked .pb-sub {
+    font-size: 12px;
+    color: var(--muted);
+    max-width: 320px;
+    line-height: 1.6;
+  }
+  #preview-blocked .pb-force {
+    margin-top: 6px;
+    padding: 9px 20px;
+    background: transparent;
+    border: 1px solid var(--warn);
+    color: var(--warn);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  #preview-blocked .pb-force:hover { background: #ff6b3522; }
+
   .preview-area { display: flex; flex-direction: column; overflow: hidden; }
 
   .preview-toolbar {
@@ -331,6 +379,34 @@
     color: var(--muted);
     letter-spacing: 0.07em;
   }
+
+  .stale-badge {
+    display: none;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    background: #ff6b3522;
+    border: 1px solid #ff6b3555;
+    color: var(--warn);
+    padding: 3px 8px;
+    border-radius: 3px;
+    letter-spacing: 0.05em;
+  }
+  .stale-badge.show { display: block; }
+
+  .btn-preview {
+    padding: 5px 14px;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 4px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+    transition: filter 0.15s;
+  }
+  .btn-preview:hover { filter: brightness(1.15); }
 
   .zoom-controls { display: flex; align-items: center; gap: 5px; margin-left: auto; }
 
@@ -567,6 +643,8 @@
   <div class="preview-area">
     <div class="preview-toolbar">
       <span class="ttl" id="toolbar-label">HEX · CIRCLE · LAYER 0 / BBOX LAYER 99</span>
+      <span class="stale-badge" id="stale-badge">● PARAMS CHANGED</span>
+      <button class="btn-preview" onclick="generatePreview()">⟳ Generate Preview</button>
       <div class="zoom-controls">
         <button class="zoom-btn" onclick="adjustZoom(-0.25)">−</button>
         <span class="zoom-level" id="zoom-disp">100%</span>
@@ -575,6 +653,13 @@
     </div>
     <div id="canvas-wrap">
       <canvas id="gds-canvas"></canvas>
+      <div id="preview-blocked">
+        <div class="pb-icon">⚠</div>
+        <div class="pb-title">PREVIEW DISABLED</div>
+        <div class="pb-count" id="pb-count">—</div>
+        <div class="pb-sub">Too many elements to render safely. The array geometry is valid — use Export .GDS to generate the file. Rendering in-browser at this scale may crash the tab.</div>
+        <button class="pb-force" onclick="forceRender()">Render anyway (may crash)</button>
+      </div>
       <div class="layer-legend">
         <div class="legend-item">
           <div class="legend-swatch" style="background:var(--accent)"></div>
@@ -628,7 +713,20 @@ function setShape(s) {
 function refresh() {
   const L = currentLattice.toUpperCase(), S = currentShape.toUpperCase();
   document.getElementById('toolbar-label').textContent = `${L} ARRAY · ${S} · LAYER 0 / BBOX LAYER 99`;
+  forceRenderFlag = false;
+  markStale();
   updateStats(getParams());
+}
+
+function markStale() {
+  document.getElementById('stale-badge').classList.add('show');
+  cachedPositionsKey = ''; // invalidate cache
+}
+function clearStale() {
+  document.getElementById('stale-badge').classList.remove('show');
+}
+function generatePreview() {
+  clearStale();
   draw();
 }
 
@@ -640,6 +738,18 @@ function getParams() {
     area:   parseFloat(document.getElementById('n-area').value)   || 200,
     inner:  parseFloat(document.getElementById('n-inner').value)  || 0,
   };
+}
+
+// Format a µm dimension for filenames: use nm when < 1 µm to avoid rounding to 0
+function fmtDim(um) {
+  if (um < 1) return Math.round(um * 1000) + 'nm';
+  return Math.round(um) + 'um';
+}
+
+function buildFilename(p) {
+  const lc = currentLattice === 'square' ? 'sq' : 'hex';
+  const sc = currentShape.substring(0, 4);
+  return `${lc}_${sc}_Dia${fmtDim(2*p.radius)}_Lcc${fmtDim(p.pitch)}_Area${fmtDim(p.area)}.gds`;
 }
 
 // ── Lattice positions ─────────────────────────────────────────────
@@ -758,36 +868,87 @@ function elementArea(r, shape, innerR) {
 }
 
 function updateStats(p) {
-  const pos = getLatticePositions(p);
-  const hw  = p.area/2;
-  const vis = pos.filter(([x,y]) => x>=-hw-p.pitch && x<=hw+p.pitch && y>=-hw-p.pitch && y<=hw+p.pitch);
+  const est = estimateCount(p);
+  const blocked = !forceRenderFlag && est > THRESH_BLOCKED;
 
-  const total = vis.length;
-  const fill  = ((total * elementArea(p.radius, currentShape, p.inner)) / (p.area*p.area) * 100).toFixed(1);
+  // Show/hide preview-blocked overlay
+  const overlay = document.getElementById('preview-blocked');
+  overlay.classList.toggle('show', blocked);
+  if (blocked) {
+    document.getElementById('pb-count').textContent = est.toLocaleString() + ' elements';
+  }
+
+  // For very large arrays, skip the full getLatticePositions call to avoid OOM
+  let total, fill;
+  if (est > THRESH_BLOCKED) {
+    total = est; // use estimate
+    fill  = ((total * elementArea(p.radius, currentShape, p.inner)) / (p.area*p.area) * 100).toFixed(1);
+  } else {
+    const pos = getLatticePositions(p);
+    const hw  = p.area/2;
+    const vis = pos.filter(([x,y]) => x>=-hw-p.pitch && x<=hw+p.pitch && y>=-hw-p.pitch && y<=hw+p.pitch);
+    total = vis.length;
+    fill  = ((total * elementArea(p.radius, currentShape, p.inner)) / (p.area*p.area) * 100).toFixed(1);
+  }
 
   let cols='—', rows='—';
   if (currentLattice === 'square') {
     cols = rows = Math.ceil(p.area / p.pitch);
   } else {
-    // hexagonal
     cols = Math.ceil(p.area / p.pitch);
     rows = Math.ceil(p.area / (p.pitch * Math.sqrt(3) / 2));
   }
 
-  document.getElementById('stat-dots').textContent = total.toLocaleString();
+  document.getElementById('stat-dots').textContent = (est > THRESH_BLOCKED ? '~' : '') + total.toLocaleString();
   document.getElementById('stat-fill').textContent = fill + '%';
   document.getElementById('stat-cols').textContent = cols;
   document.getElementById('stat-rows').textContent = rows;
 
   const lc = currentLattice === 'square' ? 'sq' : 'hex';
   const sc = currentShape.substring(0,4);
-  document.getElementById('filename-display').textContent =
-    `${lc}_${sc}_Dia${Math.round(2*p.radius)}um_Lcc${Math.round(p.pitch)}um_Area${Math.round(p.area)}um.gds`;
+  document.getElementById('filename-display').textContent = buildFilename(p);
 
   document.getElementById('ratio-warn').classList.toggle('show', p.radius*2 >= p.pitch);
 }
 
-// ── Resize & Draw ─────────────────────────────────────────────────
+let cachedPositions = null;
+let cachedPositionsKey = '';
+
+function getCachedPositions(p) {
+  const key = `${currentLattice}|${p.radius}|${p.pitch}|${p.area}`;
+  if (key !== cachedPositionsKey) {
+    cachedPositions = getLatticePositions(p);
+    cachedPositionsKey = key;
+  }
+  return cachedPositions;
+}
+
+
+const THRESH_LOD      =   8_000;   // above → LOD arc mode
+const THRESH_BLOCKED  = 400_000;   // above → hide preview entirely
+let forceRenderFlag = false;
+
+// Fast O(1) estimate — no array allocation
+function estimateCount(p) {
+  if (currentLattice === 'square') {
+    const n = Math.ceil(p.area / p.pitch) + 2;
+    return n * n;
+  } else {
+    const rowH = p.pitch * Math.sqrt(3) / 2;
+    const cols = Math.ceil(p.area / p.pitch) + 2;
+    const rows = Math.ceil(p.area / rowH) + 2;
+    return cols * rows;
+  }
+}
+
+function forceRender() {
+  forceRenderFlag = true;
+  clearStale();
+  document.getElementById('preview-blocked').classList.remove('show');
+  draw();
+}
+
+
 function resizeCanvas() {
   const wrap = document.getElementById('canvas-wrap');
   canvas.width  = wrap.clientWidth;
@@ -835,10 +996,18 @@ function draw() {
   const accent = cssVar('--accent') || '#00d4aa';
   ctx.fillStyle = accent + 'cc';
 
-  const positions = getLatticePositions(p);
+  const est = estimateCount(p);
+
+  if (!forceRenderFlag && est > THRESH_BLOCKED) {
+    // Tier 3: too dangerous — just draw the bounding box, overlay handles the rest
+    ctx.restore();
+    updateStats(p);
+    return;
+  }
+
+  const positions = getCachedPositions(p);
   const total     = positions.length;
-  const LOD_THRESHOLD = 8000;
-  const fast      = total > LOD_THRESHOLD;
+  const fast      = total > THRESH_LOD;
 
   ctx.save();
   ctx.beginPath();
@@ -846,9 +1015,8 @@ function draw() {
   ctx.clip();
 
   if (fast) {
-    // LOD: batch-arc all positions in a single path + fill.
-    // Canvas handles 100k+ arcs cheaply this way, and every position
-    // is drawn so the hex geometry is always preserved — no skipping.
+    // Tier 2: LOD — batch-arc all positions in a single path + fill.
+    // Every position is drawn so hex geometry is preserved — no skipping.
     ctx.beginPath();
     const r = p.radius * 0.72;
     for (const [x, y] of positions) {
@@ -857,6 +1025,7 @@ function draw() {
     }
     ctx.fill();
   } else {
+    // Tier 1: full shape rendering
     for (const [x, y] of positions) {
       drawShapeCanvas(x, y, p.radius, currentShape, p.inner);
     }
@@ -879,8 +1048,8 @@ function draw() {
 // ── Sync sliders ──────────────────────────────────────────────────
 function syncField(sid, nid) {
   const s=document.getElementById(sid), n=document.getElementById(nid);
-  s.addEventListener('input', ()=>{ n.value=s.value; updateStats(getParams()); draw(); });
-  n.addEventListener('input', ()=>{ s.value=n.value; updateStats(getParams()); draw(); });
+  s.addEventListener('input', ()=>{ n.value=s.value; forceRenderFlag=false; markStale(); updateStats(getParams()); });
+  n.addEventListener('input', ()=>{ s.value=n.value; forceRenderFlag=false; markStale(); updateStats(getParams()); });
 }
 syncField('r-radius','n-radius');
 syncField('r-pitch','n-pitch');
@@ -924,91 +1093,173 @@ function resetView() {
 }
 
 // ── GDS-II Binary Export ──────────────────────────────────────────
-function exportGDS() {
-  const p  = getParams();
-  const hw = p.area/2;
-  const SC = 1000; // 1μm = 1000 nm db units
-  const toInt = v => Math.round(v*SC);
 
-  function signed32(v) {
-    const buf=new ArrayBuffer(4); new DataView(buf).setInt32(0,Math.round(v),false);
-    return [...new Uint8Array(buf)];
+// Points per shape (all shapes self-close, ensureClosed never adds a point)
+function gdsNPts(shape) {
+  switch(shape) {
+    case 'circle':   return 33;
+    case 'hexagon':  return 7;
+    case 'square':   return 5;
+    case 'triangle': return 4;
+    case 'diamond':  return 5;
+    case 'octagon':  return 9;
+    case 'cross':    return 13;
+    case 'ring':     return 33; // per boundary; ring writes 2 boundaries
+    default:         return 33;
   }
-  function i16b(v){ return [(v>>8)&0xFF, v&0xFF]; }
-  function str2b(s){ const b=[]; for(const c of s) b.push(c.charCodeAt(0)); if(b.length%2) b.push(0); return b; }
-  function gdsReal(v) {
-    if(v===0) return [0,0,0,0,0,0,0,0];
-    const sg=v<0?0x80:0; v=Math.abs(v); let e=0;
-    while(v>=1){v/=16;e++;} while(v<1/16){v*=16;e--;}
-    const b=[sg|(e+64)]; let m=v;
-    for(let i=0;i<7;i++){m*=256; b.push(Math.floor(m)&0xFF); m-=Math.floor(m);}
-    return b;
-  }
-  function rec(arr,code,data){ const l=4+data.length; arr.push((l>>8)&0xFF,l&0xFF,(code>>8)&0xFF,code&0xFF,...data); }
-  function xyFromPts(pts){ const d=[]; for(const [x,y] of pts){ d.push(...signed32(toInt(x)),...signed32(toInt(y))); } return d; }
-  function ensureClosed(pts) {
-    if(!pts.length) return pts;
-    const f=pts[0],l=pts[pts.length-1];
-    if(f[0]!==l[0]||f[1]!==l[1]) return [...pts,f];
-    return pts;
-  }
+}
 
-  const HEADER=0x0002,BGNLIB=0x0102,LIBNAME=0x0206,UNITS=0x0305,ENDLIB=0x0400;
-  const BGNSTR=0x0502,STRNAME=0x0606,ENDSTR=0x0700;
-  const BOUNDARY=0x0800,ENDEL=0x1100,XY=0x1003,LAYER=0x0D02,DATATYPE=0x0E02;
+// Exact byte size of one BOUNDARY record with N points
+// BOUNDARY(4) + LAYER(6) + DATATYPE(6) + XY(4 + N*8) + ENDEL(4)
+function gdsBoundaryBytes(npts) { return 24 + npts * 8; }
 
-  const now=new Date();
-  const dt=[...i16b(now.getFullYear()),...i16b(now.getMonth()+1),...i16b(now.getDate()),
-            ...i16b(now.getHours()),...i16b(now.getMinutes()),...i16b(now.getSeconds())];
-  const dts=[...dt,...dt];
-
-  const bytes=[];
-  rec(bytes,HEADER,i16b(600));
-  rec(bytes,BGNLIB,dts);
-  rec(bytes,LIBNAME,str2b('LIBRARY'));
-  rec(bytes,UNITS,[...gdsReal(1e-3),...gdsReal(1e-9)]);
-  rec(bytes,BGNSTR,dts);
-  rec(bytes,STRNAME,str2b('ARRAY'));
-
-  const positions=getLatticePositions(p);
-
-  for (const [cx,cy] of positions) {
-    const res=shapePolygon(cx,cy,p.radius,currentShape,p.inner);
-
-    rec(bytes,BOUNDARY,[]);
-    rec(bytes,LAYER,i16b(0));
-    rec(bytes,DATATYPE,i16b(0));
-    rec(bytes,XY,xyFromPts(ensureClosed(res.outer)));
-    rec(bytes,ENDEL,[]);
-
-    if (res.inner) {
-      rec(bytes,BOUNDARY,[]);
-      rec(bytes,LAYER,i16b(1));
-      rec(bytes,DATATYPE,i16b(0));
-      rec(bytes,XY,xyFromPts(ensureClosed(res.inner)));
-      rec(bytes,ENDEL,[]);
+// Generator — yields [cx, cy] one at a time, no array allocation
+function* positionGenerator(p) {
+  const hw = p.area / 2;
+  if (currentLattice === 'square') {
+    const n = Math.ceil(p.area / p.pitch) + 2;
+    for (let r = 0; r < n; r++)
+      for (let c = 0; c < n; c++)
+        yield [-hw + c * p.pitch, -hw + r * p.pitch];
+  } else {
+    const rowH = p.pitch * Math.sqrt(3) / 2;
+    const cols = Math.ceil(p.area / p.pitch) + 2;
+    const rows = Math.ceil(p.area / rowH) + 2;
+    for (let r = 0; r < rows; r++) {
+      const off = (r % 2) * p.pitch * 0.5;
+      for (let c = 0; c < cols; c++)
+        yield [-hw + c * p.pitch + off, -hw + r * rowH];
     }
   }
+}
 
-  // Bounding box layer 99
-  const bb=[[toInt(-hw),toInt(-hw)],[toInt(hw),toInt(-hw)],[toInt(hw),toInt(hw)],[toInt(-hw),toInt(hw)],[toInt(-hw),toInt(-hw)]];
-  rec(bytes,BOUNDARY,[]);
-  rec(bytes,LAYER,i16b(99));
-  rec(bytes,DATATYPE,i16b(0));
-  const bbXY=[]; for(const[x,y]of bb){bbXY.push(...signed32(x),...signed32(y));}
-  rec(bytes,XY,bbXY);
-  rec(bytes,ENDEL,[]);
+function exportGDS() {
+  const p   = getParams();
+  const est = estimateCount(p);
+  const SC  = 1000; // 1 µm = 1000 nm db units
 
-  rec(bytes,ENDSTR,[]);
-  rec(bytes,ENDLIB,[]);
+  // Estimate file size and warn if very large
+  const npts   = gdsNPts(currentShape);
+  const bpe    = currentShape === 'ring'
+    ? gdsBoundaryBytes(npts) * 2
+    : gdsBoundaryBytes(npts);
+  const estMB  = (est * bpe / 1048576).toFixed(0);
 
-  const lc = currentLattice === 'square' ? 'sq' : 'hex';
-  const sc=currentShape.substring(0,4);
-  const fname=`${lc}_${sc}_Dia${Math.round(2*p.radius)}um_Lcc${Math.round(p.pitch)}um_Area${Math.round(p.area)}um.gds`;
+  if (est > 500_000) {
+    const ok = confirm(
+      `⚠ Large export\n\n` +
+      `~${est.toLocaleString()} elements → estimated file size ~${estMB} MB.\n\n` +
+      `This may take a moment and requires sufficient system memory. Continue?`
+    );
+    if (!ok) return;
+  }
 
-  const blob=new Blob([new Uint8Array(bytes)],{type:'application/octet-stream'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url; a.download=fname; a.click();
+  const btn = document.querySelector('.btn-primary');
+  const origLabel = btn.textContent;
+  btn.textContent = '⏳ Exporting…';
+  btn.disabled = true;
+
+  // Defer to let browser repaint the button state
+  setTimeout(() => {
+    try {
+      _runExport(p, SC, est, bpe);
+    } catch (err) {
+      alert('Export failed: ' + err.message);
+    } finally {
+      btn.textContent = origLabel;
+      btn.disabled = false;
+    }
+  }, 20);
+}
+
+function _runExport(p, SC, est, bpe) {
+  const hw = p.area / 2;
+
+  // ── Pre-allocate exact buffer ─────────────────────────────────
+  // Header overhead (generous): HEADER+BGNLIB+LIBNAME+UNITS+BGNSTR+STRNAME ≈ 200 bytes
+  // Per element: bpe bytes
+  // Bounding box: gdsBoundaryBytes(5) = 64 bytes
+  // Footer: ENDSTR(4) + ENDLIB(4) = 8 bytes
+  const totalBytes = 200 + est * bpe + gdsBoundaryBytes(5) + 8;
+  const buf = new ArrayBuffer(totalBytes);
+  const dv  = new DataView(buf);
+  let   pos = 0;
+
+  // ── Low-level write helpers ───────────────────────────────────
+  const u8  = v => dv.setUint8(pos++, v & 0xFF);
+  const u16 = v => { dv.setUint16(pos, v, false); pos += 2; };
+  const i16 = v => { dv.setInt16(pos,  v, false); pos += 2; };
+  const i32 = v => { dv.setInt32(pos,  v, false); pos += 4; };
+
+  function recH(code, dataLen) { u16(4 + dataLen); u16(code); }
+  function recEmpty(code)      { u16(4); u16(code); }
+  function recI16(code, v)     { recH(code, 2); i16(v); }
+
+  function recStr(code, s) {
+    const pad = s.length % 2 ? 1 : 0;
+    recH(code, s.length + pad);
+    for (const c of s) u8(c.charCodeAt(0));
+    if (pad) u8(0);
+  }
+
+  function writeGdsReal(v) {
+    if (v === 0) { for (let i = 0; i < 8; i++) u8(0); return; }
+    const sg = v < 0 ? 0x80 : 0; v = Math.abs(v); let e = 0;
+    while (v >= 1)    { v /= 16; e++; }
+    while (v < 1/16)  { v *= 16; e--; }
+    u8(sg | (e + 64));
+    let m = v;
+    for (let i = 0; i < 7; i++) { m *= 256; const b = Math.floor(m); u8(b & 0xFF); m -= b; }
+  }
+
+  function recDt(code) {
+    recH(code, 24);
+    const n = new Date();
+    const d = [n.getFullYear(), n.getMonth()+1, n.getDate(), n.getHours(), n.getMinutes(), n.getSeconds()];
+    for (let t = 0; t < 2; t++) for (const v of d) i16(v);
+  }
+
+  function writeBoundary(ptsArr, layer) {
+    // ptsArr: array of [x_µm, y_µm] — already closed
+    recEmpty(0x0800);      // BOUNDARY
+    recI16(0x0D02, layer); // LAYER
+    recI16(0x0E02, 0);     // DATATYPE
+    recH(0x1003, ptsArr.length * 8); // XY
+    for (const [x, y] of ptsArr) {
+      i32(Math.round(x * SC));
+      i32(Math.round(y * SC));
+    }
+    recEmpty(0x1100);      // ENDEL
+  }
+
+  // ── GDS header ────────────────────────────────────────────────
+  recI16(0x0002, 600);      // HEADER
+  recDt(0x0102);            // BGNLIB
+  recStr(0x0206, 'LIBRARY'); // LIBNAME
+  recH(0x0305, 16); writeGdsReal(1e-3); writeGdsReal(1e-9); // UNITS
+  recDt(0x0502);            // BGNSTR
+  recStr(0x0606, 'ARRAY');  // STRNAME
+
+  // ── Elements (streaming — no positions array) ─────────────────
+  for (const [cx, cy] of positionGenerator(p)) {
+    const res = shapePolygon(cx, cy, p.radius, currentShape, p.inner);
+    writeBoundary(res.outer, 0);
+    if (res.inner) writeBoundary(res.inner, 1);
+  }
+
+  // ── Bounding box layer 99 ─────────────────────────────────────
+  writeBoundary([[-hw,-hw],[hw,-hw],[hw,hw],[-hw,hw],[-hw,-hw]], 99);
+
+  recEmpty(0x0700); // ENDSTR
+  recEmpty(0x0400); // ENDLIB
+
+  // ── Download exact slice of buffer ───────────────────────────
+  const fname = buildFilename(p);
+
+  const blob = new Blob([buf.slice(0, pos)], { type: 'application/octet-stream' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = fname; a.click();
   URL.revokeObjectURL(url);
 }
 
@@ -1016,6 +1267,8 @@ function exportGDS() {
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 updateStats(getParams());
+// Draw once on load with defaults so the canvas isn't blank
+generatePreview();
 </script>
 </body>
 </html>
