@@ -723,12 +723,7 @@ function shapePolygon(cx, cy, r, shape, innerR) {
 }
 
 // ── Draw single shape on canvas ───────────────────────────────────
-function drawShapeCanvas(cx, cy, r, shape, innerR, fast) {
-  if (fast) {
-    const sq = r * 1.4;
-    ctx.fillRect(cx - sq/2, cy - sq/2, sq, sq);
-    return;
-  }
+function drawShapeCanvas(cx, cy, r, shape, innerR) {
   const res = shapePolygon(cx, cy, r, shape, innerR);
   if (shape === 'ring') {
     ctx.save();
@@ -842,18 +837,29 @@ function draw() {
 
   const positions = getLatticePositions(p);
   const total     = positions.length;
-  const MAX_DRAW  = 6000;
-  const fast      = total > MAX_DRAW;
-  const skip      = fast ? Math.ceil(Math.sqrt(total/MAX_DRAW)) : 1;
+  const LOD_THRESHOLD = 8000;
+  const fast      = total > LOD_THRESHOLD;
 
   ctx.save();
   ctx.beginPath();
   ctx.rect(-hw - p.radius*2, -hw - p.radius*2, p.area + p.radius*4, p.area + p.radius*4);
   ctx.clip();
 
-  for (let i=0; i<positions.length; i+=skip) {
-    const [x,y] = positions[i];
-    drawShapeCanvas(x, y, p.radius, currentShape, p.inner, fast);
+  if (fast) {
+    // LOD: batch-arc all positions in a single path + fill.
+    // Canvas handles 100k+ arcs cheaply this way, and every position
+    // is drawn so the hex geometry is always preserved — no skipping.
+    ctx.beginPath();
+    const r = p.radius * 0.72;
+    for (const [x, y] of positions) {
+      ctx.moveTo(x + r, y);
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+    }
+    ctx.fill();
+  } else {
+    for (const [x, y] of positions) {
+      drawShapeCanvas(x, y, p.radius, currentShape, p.inner);
+    }
   }
 
   ctx.restore();
@@ -863,7 +869,7 @@ function draw() {
     ctx.save();
     ctx.fillStyle = '#ff6b35';
     ctx.font = '11px Space Mono, monospace';
-    ctx.fillText(`⚡ LOD preview (${total.toLocaleString()} elements — zoom in for detail)`, 12, H-14);
+    ctx.fillText(`⚡ LOD preview — ${total.toLocaleString()} elements (zoom in for shape detail)`, 12, H-14);
     ctx.restore();
   }
 
